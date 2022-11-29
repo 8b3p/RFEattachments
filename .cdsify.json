@@ -1,0 +1,11 @@
+{
+  "entities": [
+    "axa_attachment",
+    "axa_requestforexpenditure"
+  ],
+  "actions": [],
+  "functions": [],
+  "output": {
+    "outputRoot": "./RFEattachments/cds-generated"
+  }
+}
