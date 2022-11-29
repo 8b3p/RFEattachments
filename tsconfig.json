@@ -1,6 +1,9 @@
 {
-    "extends": "./node_modules/pcf-scripts/tsconfig_base.json",
-    "compilerOptions": {
-        "typeRoots": ["node_modules/@types"],
-    }
+  "extends": "./node_modules/pcf-scripts/tsconfig_base.json",
+  "compilerOptions": {
+    "typeRoots": ["node_modules/@types"],
+    "plugins": [{ "name": "typescript-plugin-css-modules" }],
+    "target": "ES6",
+    "noUnusedParameters": true
+  }
 }

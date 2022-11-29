@@ -1,0 +1,4 @@
+nodecds:
+  server:
+    host: https://axagdev1.crm.dynamics.com/
+    version: 9.1
