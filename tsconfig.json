@@ -3,7 +3,7 @@
   "compilerOptions": {
     "typeRoots": ["node_modules/@types"],
     "plugins": [{ "name": "typescript-plugin-css-modules" }],
-    "target": "ES6",
+    "target": "ESNext",
     "noUnusedParameters": true
   }
 }

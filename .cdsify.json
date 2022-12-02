@@ -1,7 +1,8 @@
 {
   "entities": [
     "axa_attachment",
-    "axa_requestforexpenditure"
+    "axa_requestforexpenditure",
+    "annotation"
   ],
   "actions": [],
   "functions": [],

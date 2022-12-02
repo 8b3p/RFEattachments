@@ -2,19 +2,18 @@ import * as React from "react";
 import { useEffect, useState } from "react";
 import { IColumn, TooltipHost } from "@fluentui/react";
 import styles from "../Components/App.module.css";
-import { filetype } from "../types/FileType";
+import AttachmentVM from "../Context/AttachmentVM";
+import { axa_attachment_axa_attachment_axa_type } from "../cds-generated/enums/axa_attachment_axa_attachment_axa_type";
 
-export interface IDocument {
+export interface IRow {
   key: string;
-  name: string;
   type: string;
-  fileType: string;
   iconSource: string;
 }
 
-export default function useDetailsList() {
+export default function useDetailsList({ vm }: { vm: AttachmentVM }) {
   const [columns, setColumns] = useState<IColumn[]>([]);
-  const [items, setItems] = useState<IDocument[]>([]);
+  const [items, setItems] = useState<IRow[]>([]);
   const [selectionDetails, setSelectionDetails] = useState<string>("");
   const [isModalSelection, setIsModalSelection] = useState<boolean>(false);
   const [isCompactMode, setIsCompactMode] = useState<boolean>(false);
@@ -67,44 +66,18 @@ export default function useDetailsList() {
   };
 
   useEffect(() => {
-    const _items: IDocument[] = [
-      {
-        key: "a",
-        name: "Document1",
-        type: "Word Document",
-        fileType: filetype.docx,
-        iconSource:
-          "https://static2.sharepointonline.com/files/fabric/assets/brand-icons/document/svg/docx_48x1.svg",
-      },
-      {
-        key: "b",
-        name: "Document2",
-        type: "PDF Document",
-        fileType: filetype.pdf,
-        iconSource:
-          "https://static2.sharepointonline.com/files/fabric/assets/brand-icons/document/svg/docx_48x1.svg",
-      },
-      {
-        key: "c",
-        name: "Document3",
-        type: "Excel Document",
-        fileType: filetype.xlsx,
-        iconSource:
-          "https://static2.sharepointonline.com/files/fabric/assets/brand-icons/document/svg/docx_48x1.svg",
-      },
-      {
-        key: "e",
-        name: "Document5",
-        type: "PowerPoint Document",
-        fileType: filetype.pptx,
-        iconSource:
-          "https://static2.sharepointonline.com/files/fabric/assets/brand-icons/document/svg/docx_48x1.svg",
-      },
-    ];
+    const _items: IRow[] = [];
 
-    _items.forEach(item => {
-      item.iconSource = fileIconLink(item.fileType).url;
+    vm.Attachments.forEach(attachment => {
+      _items.push({
+        key: attachment.attachmentId?.id || "",
+        type: axa_attachment_axa_attachment_axa_type[attachment.type],
+        iconSource: fileIconLink(
+          vm.cdsService.GetFileExtension(attachment.extension || "")
+        ).url,
+      });
     });
+
     setItems(_items);
     setColumns([
       {
@@ -116,16 +89,16 @@ export default function useDetailsList() {
           "Column operations for File type, Press to sort on File type",
         iconName: "Page",
         isIconOnly: true,
-        fieldName: "name",
+        fieldName: "type",
         minWidth: 16,
         maxWidth: 16,
         onColumnClick: onColumnClick,
-        onRender: (item: IDocument) => (
-          <TooltipHost content={`${item.fileType} file`}>
+        onRender: (item: IRow) => (
+          <TooltipHost content={`${item.type} file`}>
             <img
               src={item.iconSource}
               className={styles.fileIconImg}
-              alt={`${item.fileType} file icon`}
+              alt={`${item.type} file icon`}
             />
           </TooltipHost>
         ),
@@ -147,7 +120,7 @@ export default function useDetailsList() {
         isPadded: true,
       },
     ]);
-  }, []);
+  }, [vm.Attachments]);
 
   return {
     columns,

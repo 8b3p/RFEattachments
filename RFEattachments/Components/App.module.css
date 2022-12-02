@@ -22,8 +22,12 @@
 }
 .controlWrapper {
   display: flex;
+  align-items: center;
+  justify-content: end;
+  gap: 1em;
   flex-wrap: wrap;
 }
+
 .exampleToggle {
   display: inline-block;
   margin-bottom: 10px;

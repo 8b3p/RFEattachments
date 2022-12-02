@@ -20,17 +20,17 @@ export class RFEattachments extends StandardControlReact<IInputs, IOutputs> {
       );
     };
     this.reactCreateElement = (
-      container: HTMLDivElement
-      // width: number | undefined,
-      // height: number | undefined,
-      // serviceProvider: ServiceProvider
+      container: HTMLDivElement,
+      _width: number | undefined,
+      _height: number | undefined,
+      serviceProvider: ServiceProvider
     ) => {
       ReactDOM.render(
         React.createElement(App, {
           // context: this.context,
           // width: width,
           // height: height,
-          // serviceProvider: serviceProvider,
+          serviceProvider: serviceProvider,
         }),
         container
       );
