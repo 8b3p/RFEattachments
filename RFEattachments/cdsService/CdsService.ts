@@ -102,66 +102,89 @@ export default class CdsService {
       attachmentId: new EntityReference(axa_attachmentMetadata.logicalName, ""),
       type: type,
       rfe: new EntityReference(entityLogicalName, entityId),
+      extension: this.GetFileExtension(file.name),
+      file: file,
     });
-    let attachmentId;
+
+    const encodedData = await this.EncodeFile(file);
     try {
       let data = {
         axa_type: type,
-        axa_name: "",
         ["axa_RFE@odata.bind"]: `/${axa_requestforexpenditureMetadata.collectionName}(${entityId})`,
       };
       const response = await this.context.webAPI.createRecord(
         axa_attachmentMetadata.logicalName,
         data
       );
-      attachmentId = response?.id;
+      if (response) {
+        attachment.attachmentId.id = response?.id;
+      } else {
+        return new Error("No response from CDS");
+      }
     } catch (e: any) {
       console.error(e.message);
       return new Error(e.message);
     }
 
-    const encodedData = await this.toBase64(file);
-
-    try {
-      let result = await this.context.webAPI.createRecord("fileattachment", {
-        [`objectid_${axa_attachmentMetadata.logicalName}@odata.bind`]: `/${axa_attachmentMetadata.collectionName}(${attachmentId})`,
-        filename: file.name,
-        objecttypecode: axa_attachmentMetadata.logicalName,
-        regardingfieldname: "axa_file",
-        // body: encodedData,
-      });
-      console.dir(result);
-    } catch (e: any) {
-      console.error(e.message);
+    //upload the file to the File field of the attachment
+    if (attachment.attachmentId.id) {
+      try {
+        const response = await fetch(
+          `/api/data/v9.1/axa_attachments(${attachment.attachmentId.id})/axa_file?x-ms-file-name=${file.name}`,
+          {
+            method: "PATCH",
+            headers: {
+              Accept: "/",
+              "Content-Type": "application/octet-stream",
+              Prefer: 'odata.include-annotations="*"',
+              "OData-Version": "4.0",
+            },
+            body: encodedData,
+          }
+        );
+        if (!response.ok) {
+          console.error(response.statusText);
+          return new Error(response.statusText);
+        }
+      } catch (e: any) {
+        console.error(e.message);
+        return new Error(e.message);
+      }
     }
 
-    const response = await this.context.webAPI.updateRecord(
-      axa_attachmentMetadata.logicalName,
-      attachmentId,
-      {
-        axa_file: encodedData,
-      }
-    );
-
-    console.dir(response);
-    console.log(file.type);
     console.log(
-      `Attachment: ${file.name} has been uploaded to the ${entityLogicalName} with id: ${entityId}`
-    );
-
-    attachment.attachmentId = new EntityReference(
-      axa_attachmentMetadata.logicalName,
-      attachmentId
-    );
-    attachment.extension = this.GetFileExtension(file.name);
-    attachment.type = type;
-    attachment.rfe = new EntityReference(
-      entityLogicalName,
-      entityId,
-      entityLogicalName
+      `Attachment: ${file.name} has been uploaded to ${entityLogicalName} with id: ${entityId}`
     );
 
     return attachment;
+  }
+
+  public async deleteAttachments(attachments: Attachment[]) {
+    let attachmentIds = attachments
+      .map(attachment => attachment.attachmentId.id)
+      .filter(id => id) as string[];
+    try {
+      let response = await Promise.allSettled(
+        attachmentIds.map(attachmentId => {
+          return this.context.webAPI.deleteRecord(
+            axa_attachmentMetadata.logicalName,
+            attachmentId
+          );
+        })
+      );
+      response.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          console.log(
+            `Attachment: ${attachments[index].attachmentId.id} has been deleted`
+          );
+        } else {
+          console.error(result.reason);
+        }
+      });
+    } catch (e: any) {
+      console.error(e.message);
+      return new Error(e.message);
+    }
   }
 
   public toBase64(file: File): Promise<string> {

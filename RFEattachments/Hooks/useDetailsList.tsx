@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useEffect, useState } from "react";
-import { IColumn, TooltipHost } from "@fluentui/react";
+import { IColumn, IDropdownOption, TooltipHost } from "@fluentui/react";
 import styles from "../Components/App.module.css";
 import AttachmentVM from "../Context/AttachmentVM";
 import { axa_attachment_axa_attachment_axa_type } from "../cds-generated/enums/axa_attachment_axa_attachment_axa_type";
@@ -8,24 +8,19 @@ import { axa_attachment_axa_attachment_axa_type } from "../cds-generated/enums/a
 export interface IRow {
   key: string;
   type: string;
+  fileName: string;
   iconSource: string;
 }
 
 export default function useDetailsList({ vm }: { vm: AttachmentVM }) {
-  const [columns, setColumns] = useState<IColumn[]>([]);
-  const [items, setItems] = useState<IRow[]>([]);
-  const [selectionDetails, setSelectionDetails] = useState<string>("");
-  const [isModalSelection, setIsModalSelection] = useState<boolean>(false);
   const [isCompactMode, setIsCompactMode] = useState<boolean>(false);
-  const [announcedMessage, setAnnouncedMessage] = useState<string | undefined>(
-    undefined
-  );
+  const [typeOprtions, setTypeOptions] = useState<IDropdownOption[]>([]);
 
   const onColumnClick = (
     _ev: React.MouseEvent<HTMLElement>,
     column: IColumn
   ) => {
-    const newColumns: IColumn[] = columns.slice();
+    const newColumns: IColumn[] = vm.listColumns.slice();
     const currColumn: IColumn = newColumns.filter(
       currCol => column.key === currCol.key
     )[0];
@@ -33,19 +28,14 @@ export default function useDetailsList({ vm }: { vm: AttachmentVM }) {
       if (newCol === currColumn) {
         currColumn.isSortedDescending = !currColumn.isSortedDescending;
         currColumn.isSorted = true;
-        setAnnouncedMessage(
-          `${currColumn.name} is sorted ${
-            currColumn.isSortedDescending ? "descending" : "ascending"
-          }`
-        );
       } else {
         newCol.isSorted = false;
         newCol.isSortedDescending = true;
       }
     });
-    const newItems = copyAndSort(items, currColumn);
-    setColumns(newColumns);
-    setItems(newItems);
+    const newItems = copyAndSort(vm.listItems, currColumn);
+    vm.listColumns = newColumns;
+    vm.listItems = newItems;
   };
 
   const fileIconLink = (docType: string): { url: string } => {
@@ -59,7 +49,7 @@ export default function useDetailsList({ vm }: { vm: AttachmentVM }) {
     return items
       .slice(0)
       .sort((a: T, b: T) =>
-        (currCol.isSortedDescending ? a[key] < b[key] : a[key] > b[key])
+        (currCol.isSortedDescending ? a[key] > b[key] : a[key] < b[key])
           ? 1
           : -1
       );
@@ -67,19 +57,19 @@ export default function useDetailsList({ vm }: { vm: AttachmentVM }) {
 
   useEffect(() => {
     const _items: IRow[] = [];
-
     vm.Attachments.forEach(attachment => {
       _items.push({
         key: attachment.attachmentId?.id || "",
         type: axa_attachment_axa_attachment_axa_type[attachment.type],
+        fileName: vm.cdsService.TrimFileExtension(attachment.file?.name || ""),
         iconSource: fileIconLink(
           vm.cdsService.GetFileExtension(attachment.extension || "")
         ).url,
       });
     });
+    vm.listItems = _items;
 
-    setItems(_items);
-    setColumns([
+    vm.listColumns = [
       {
         key: "column1",
         name: "File Type",
@@ -90,12 +80,13 @@ export default function useDetailsList({ vm }: { vm: AttachmentVM }) {
         iconName: "Page",
         isIconOnly: true,
         fieldName: "type",
-        minWidth: 16,
-        maxWidth: 16,
-        onColumnClick: onColumnClick,
+        minWidth: 30,
+        maxWidth: 30,
         onRender: (item: IRow) => (
-          <TooltipHost content={`${item.type} file`}>
+          <TooltipHost content={`${item.fileName} File`}>
             <img
+              width={16}
+              height={16}
               src={item.iconSource}
               className={styles.fileIconImg}
               alt={`${item.type} file icon`}
@@ -119,22 +110,42 @@ export default function useDetailsList({ vm }: { vm: AttachmentVM }) {
         data: "string",
         isPadded: true,
       },
+    ];
+    setTypeOptions([
+      {
+        key: axa_attachment_axa_attachment_axa_type.BidWaiver,
+        text: axa_attachment_axa_attachment_axa_type[
+          axa_attachment_axa_attachment_axa_type.BidWaiver
+        ],
+      },
+      {
+        key: axa_attachment_axa_attachment_axa_type.DFA,
+        text: axa_attachment_axa_attachment_axa_type[
+          axa_attachment_axa_attachment_axa_type.DFA
+        ],
+      },
+      {
+        key: axa_attachment_axa_attachment_axa_type.MiscDocs,
+        text: axa_attachment_axa_attachment_axa_type[
+          axa_attachment_axa_attachment_axa_type.MiscDocs
+        ],
+      },
+      {
+        key: axa_attachment_axa_attachment_axa_type.Quote,
+        text: axa_attachment_axa_attachment_axa_type[
+          axa_attachment_axa_attachment_axa_type.Quote
+        ],
+      },
     ]);
   }, [vm.Attachments]);
 
   return {
-    columns,
-    setColumns,
-    items,
-    setItems,
-    selectionDetails,
-    setSelectionDetails,
-    isModalSelection,
-    setIsModalSelection,
+    typeOprtions,
+    setTypeOptions,
     isCompactMode,
     setIsCompactMode,
-    announcedMessage,
-    setAnnouncedMessage,
     onColumnClick,
+    fileIconLink,
+    copyAndSort,
   };
 }

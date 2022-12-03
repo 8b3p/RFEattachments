@@ -3,7 +3,6 @@ import React = require("react");
 import ReactDOM = require("react-dom");
 import CdsService, { cdsServiceName } from "./cdsService/CdsService";
 import App from "./Components/App";
-import Temp from "./Components/temp";
 import AttachmentVM, { AttachmentVMserviceName } from "./Context/AttachmentVM";
 import { IInputs, IOutputs } from "./generated/ManifestTypes";
 
@@ -21,15 +20,15 @@ export class RFEattachments extends StandardControlReact<IInputs, IOutputs> {
     };
     this.reactCreateElement = (
       container: HTMLDivElement,
-      _width: number | undefined,
-      _height: number | undefined,
+      width: number | undefined,
+      height: number | undefined,
       serviceProvider: ServiceProvider
     ) => {
       ReactDOM.render(
         React.createElement(App, {
-          // context: this.context,
-          // width: width,
-          // height: height,
+          context: this.context,
+          width: width,
+          height: height,
           serviceProvider: serviceProvider,
         }),
         container
