@@ -7,56 +7,26 @@ import {
 } from "@fluentui/react";
 import styles from "./App.module.css";
 import { useAttachmentVM } from "../Context/context";
-import useDetailsList from "../Hooks/useDetailsList";
 import { observer } from "mobx-react-lite";
 import Actions from "./CommandBar";
 import { Attachment } from "../types/Attachment";
 
 const AttachmentsList = () => {
   const vm = useAttachmentVM();
-  const { typeOprtions: typeOptions, isCompactMode } = useDetailsList({
-    vm,
-  });
-
-  const selection = new Selection({
-    onSelectionChanged: () => {
-      vm.isDeleteEnabled = selection.getSelectedCount() > 0;
-      console.log(selection.getSelectedCount() > 0);
-      if (selection.getSelectedCount() > 0) {
-        console.log(true);
-        vm.selectedAttachments = selection
-          .getSelection()
-          .map(item => {
-            return vm.Attachments.find(attachment => {
-              return attachment.attachmentId.id === item.key;
-            });
-          })
-          .filter(item => item !== undefined) as Attachment[];
-      } else {
-        console.log(false);
-        vm.selectedAttachments = [];
-      }
-    },
-  });
-
-  const getKey = (item: any) => {
-    return item.key;
-  };
 
   return (
     <div className={styles.container}>
-      <Actions typeOptions={typeOptions} />
+      <Actions />
 
-      <MarqueeSelection selection={selection}>
+      <MarqueeSelection selection={vm.selection}>
         <DetailsList
           items={vm.listItems}
-          compact={isCompactMode}
           columns={vm.listColumns}
-          getKey={getKey}
+          getKey={vm.getKey}
           setKey='multiple'
           layoutMode={DetailsListLayoutMode.justified}
           isHeaderVisible={true}
-          selection={selection}
+          selection={vm.selection}
           selectionPreservedOnEmptyClick={true}
           onItemInvoked={item => alert(`Item invoked: ${item.name}`)}
           enterModalSelectionOnTouch={true}
