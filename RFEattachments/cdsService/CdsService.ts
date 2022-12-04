@@ -5,6 +5,7 @@ import {
 } from "../cds-generated/entities/axa_Attachment";
 import { axa_requestforexpenditureMetadata } from "../cds-generated/entities/axa_RequestforExpenditure";
 import { axa_attachment_axa_attachment_axa_type } from "../cds-generated/enums/axa_attachment_axa_attachment_axa_type";
+import { axa_rfestatus } from "../cds-generated/enums/axa_rfestatus";
 import { IInputs } from "../generated/ManifestTypes";
 import { Attachment } from "../types/Attachment";
 import { FileToDownload } from "../types/FileToDownload";
@@ -29,7 +30,27 @@ export default class CdsService {
     return file;
   }
 
-  public async retrieveRecordByRfeId(
+  public async retrieveRfeStatus(
+    rfeId: string
+  ): Promise<axa_rfestatus | Error> {
+    try {
+      const response = await this.context.webAPI.retrieveRecord(
+        axa_requestforexpenditureMetadata.logicalName,
+        rfeId,
+        "?$select=axa_rfestatus"
+      );
+      if (response) {
+        return response.axa_rfestatus as axa_rfestatus;
+      } else {
+        return new Error("No response from CDS");
+      }
+    } catch (e: any) {
+      console.error(e.message);
+      return new Error(e.message);
+    }
+  }
+
+  public async retrieveAttachmentByRfeId(
     rfeId: string
   ): Promise<Attachment[] | Error> {
     const query = `
@@ -58,7 +79,6 @@ export default class CdsService {
       console.error(e.message);
     }
     if (response) {
-      console.dir(response.entities);
       const attachments = response.entities.map(entity => {
         const attachment = entity as axa_Attachment;
         const newAttachment = new Attachment({

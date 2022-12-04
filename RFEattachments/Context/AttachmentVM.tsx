@@ -14,6 +14,7 @@ import { IInputs } from "../generated/ManifestTypes";
 import { Attachment } from "../types/Attachment";
 import styles from "../Components/App.module.css";
 import { copyAndSort, fileIconLink } from "../utils/utils";
+import { axa_rfestatus } from "../cds-generated/enums/axa_rfestatus";
 
 export interface IRow {
   key: string;
@@ -27,10 +28,12 @@ export default class AttachmentVM {
   public selectedAttachments: Attachment[] = [];
   public listItems: IRow[] = [];
   public listColumns: IColumn[];
+  public isControlDisabled: boolean = false;
   public commandBarItems: ICommandBarItemProps[];
   public farCommandBarItems: ICommandBarItemProps[];
   public serviceProvider: ServiceProvider;
   public context: ComponentFramework.Context<IInputs>;
+  public isPanelOpen: boolean = false;
   public rfeGuid: string;
   public cdsService: CdsService;
   public isLoading: boolean = false;
@@ -38,9 +41,8 @@ export default class AttachmentVM {
   public isDeleteDialogOpen: boolean = false;
   public selection = new Selection({
     onSelectionChanged: () => {
-      this.farCommandBarItems[0].disabled = !(
-        this.selection.getSelectedCount() > 0
-      );
+      this.farCommandBarItems[0].disabled =
+        !(this.selection.getSelectedCount() > 0) || this.isControlDisabled;
       this.farCommandBarItems = [...this.farCommandBarItems];
       if (this.selection.getSelectedCount() > 0) {
         this.selectedAttachments = this.selection
@@ -69,16 +71,35 @@ export default class AttachmentVM {
 
   public fetchData = async () => {
     this.isLoading = true;
-    const result = await this.cdsService.retrieveRecordByRfeId(this.rfeGuid);
-    if (result instanceof Error) {
-      console.error(result.message);
+    const [result1, result2] = await Promise.allSettled([
+      this.cdsService.retrieveAttachmentByRfeId(this.rfeGuid),
+      this.cdsService.retrieveRfeStatus(this.rfeGuid),
+    ]);
+    if (result1.status === "fulfilled") {
+      const result = result1.value;
+      if (result instanceof Error) {
+        console.error(result.message);
+        this.isLoading = false;
+        this.error = result;
+        return;
+      }
+      this.Attachments = result;
       this.isLoading = false;
-      this.error = result;
-      return;
+      this.populateUI();
     }
-    this.Attachments = result;
-    this.isLoading = false;
-    this.populateUI();
+    if (result2.status === "fulfilled") {
+      const result = result2.value;
+      if (result instanceof Error) {
+        console.error(result.message);
+        this.isLoading = false;
+        this.error = result;
+        return;
+      }
+      this.isControlDisabled = result !== axa_rfestatus.Draft;
+      this.commandBarItems[0].disabled = this.isControlDisabled;
+      this.farCommandBarItems = [...this.farCommandBarItems];
+      this.isLoading = false;
+    }
   };
 
   public populateUI = () => {
@@ -137,6 +158,18 @@ export default class AttachmentVM {
         onColumnClick: this.onColumnClick,
         data: "string",
         isPadded: true,
+      },
+    ];
+    this.commandBarItems = [
+      {
+        key: "newItem",
+        text: "New",
+        cacheKey: "myCacheKey", // changing this key will invalidate this item's cache
+        iconProps: { iconName: "Add" },
+        disabled: this.isControlDisabled,
+        onClick: () => {
+          this.isPanelOpen = true;
+        },
       },
     ];
     this.farCommandBarItems = [

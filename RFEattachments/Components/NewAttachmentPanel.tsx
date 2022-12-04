@@ -21,11 +21,6 @@ import { useAttachmentVM } from "../Context/context";
 import styles from "./App.module.css";
 import { useBoolean } from "@fluentui/react-hooks";
 
-interface props {
-  dismissPanel: () => void;
-  isOpen: boolean;
-}
-
 const typeOptions: IDropdownOption[] = [
   {
     key: axa_attachment_axa_attachment_axa_type.BidWaiver,
@@ -53,7 +48,7 @@ const typeOptions: IDropdownOption[] = [
   },
 ];
 
-const NewAttachmentPanel = ({ isOpen, dismissPanel }: props) => {
+const NewAttachmentPanel = () => {
   const vm = useAttachmentVM();
   const [errorMessage, setErrorMessage] = React.useState<string>();
   const [file, setFile] = React.useState<File>();
@@ -117,7 +112,7 @@ const NewAttachmentPanel = ({ isOpen, dismissPanel }: props) => {
       setTypeInput(undefined);
       setErrorMessage(undefined);
       stopLoading();
-      dismissPanel();
+      vm.isPanelOpen = false;
     }
     setErrorMessage("Please select a file and type");
   };
@@ -135,7 +130,7 @@ const NewAttachmentPanel = ({ isOpen, dismissPanel }: props) => {
           setFile(undefined);
           setTypeInput(undefined);
           setErrorMessage(undefined);
-          dismissPanel();
+          vm.isPanelOpen = false;
         }}
       >
         Cancel
@@ -147,7 +142,7 @@ const NewAttachmentPanel = ({ isOpen, dismissPanel }: props) => {
     <div>
       <Panel
         headerText='Create New Attachment'
-        isOpen={isOpen}
+        isOpen={vm.isPanelOpen}
         onOpen={() => {
           setFile(undefined);
           setTypeInput(undefined);
@@ -157,7 +152,7 @@ const NewAttachmentPanel = ({ isOpen, dismissPanel }: props) => {
           setFile(undefined);
           setTypeInput(undefined);
           setErrorMessage(undefined);
-          dismissPanel();
+          vm.isPanelOpen = false;
         }}
         onRenderFooterContent={onRenderFooterContent}
         // You MUST provide this prop! Otherwise screen readers will just say "button" with no label.

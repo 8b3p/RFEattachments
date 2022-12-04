@@ -5,7 +5,6 @@ import {
   DialogFooter,
   DialogType,
   FocusTrapZone,
-  ICommandBarItemProps,
   Layer,
   Overlay,
   PrimaryButton,
@@ -15,7 +14,6 @@ import {
 import { observer } from "mobx-react-lite";
 import { useBoolean } from "@fluentui/react-hooks";
 import * as React from "react";
-import { useEffect, useState } from "react";
 import { useAttachmentVM } from "../Context/context";
 import NewAttachmentPanel from "./NewAttachmentPanel";
 import styles from "./App.module.css";
@@ -33,32 +31,13 @@ const Actions = ({}: props) => {
   const vm = useAttachmentVM();
   const [isLoading, { setTrue: startLoading, setFalse: stopLoading }] =
     useBoolean(false);
-  const [isOpen, { setTrue: openPanel, setFalse: dismissPanel }] =
-    useBoolean(false);
-  const [commandBarItems, setCommandBarItems] = useState<
-    ICommandBarItemProps[]
-  >([]);
 
   const modalProps = { isBlocking: false };
 
-  useEffect(() => {
-    setCommandBarItems([
-      {
-        key: "newItem",
-        text: "New",
-        cacheKey: "myCacheKey", // changing this key will invalidate this item's cache
-        iconProps: { iconName: "Add" },
-        onClick: () => {
-          openPanel();
-        },
-      },
-    ]);
-  }, [openPanel, vm.Attachments]);
-
   return (
     <>
-      <CommandBar items={commandBarItems} farItems={vm.farCommandBarItems} />
-      <NewAttachmentPanel isOpen={isOpen} dismissPanel={dismissPanel} />
+      <CommandBar items={vm.commandBarItems} farItems={vm.farCommandBarItems} />
+      <NewAttachmentPanel />
       <Dialog
         hidden={!vm.isDeleteDialogOpen}
         onDismiss={() => {
