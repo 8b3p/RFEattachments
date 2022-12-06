@@ -56,3 +56,9 @@
   align-items: center;
   margin: auto;
 }
+
+.dropdown-container div,
+.dropdown-container button {
+  width: 100%;
+  margin-block: 5px;
+}

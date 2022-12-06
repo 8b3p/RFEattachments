@@ -3,13 +3,11 @@ import {
   DetailsList,
   DetailsListLayoutMode,
   MarqueeSelection,
-  Selection,
 } from "@fluentui/react";
 import styles from "./App.module.css";
 import { useAttachmentVM } from "../Context/context";
 import { observer } from "mobx-react-lite";
 import Actions from "./CommandBar";
-import { Attachment } from "../types/Attachment";
 
 const AttachmentsList = () => {
   const vm = useAttachmentVM();
@@ -28,7 +26,10 @@ const AttachmentsList = () => {
           isHeaderVisible={true}
           selection={vm.selection}
           selectionPreservedOnEmptyClick={true}
-          onItemInvoked={item => alert(`Item invoked: ${item.name}`)}
+          onItemInvoked={() => {
+            vm.formType = "edit";
+            vm.isPanelOpen = true;
+          }}
           enterModalSelectionOnTouch={true}
           ariaLabelForSelectionColumn='Toggle selection'
           ariaLabelForSelectAllCheckbox='Toggle selection for all items'

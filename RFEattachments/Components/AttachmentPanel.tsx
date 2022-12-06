@@ -13,6 +13,7 @@ import {
   Spinner,
   SpinnerSize,
   Stack,
+  Text,
 } from "@fluentui/react";
 import { observer } from "mobx-react-lite";
 import * as React from "react";
@@ -20,6 +21,7 @@ import { axa_attachment_axa_attachment_axa_type } from "../cds-generated/enums/a
 import { useAttachmentVM } from "../Context/context";
 import styles from "./App.module.css";
 import { useBoolean } from "@fluentui/react-hooks";
+import { Attachment } from "../types/Attachment";
 
 const typeOptions: IDropdownOption[] = [
   {
@@ -48,7 +50,7 @@ const typeOptions: IDropdownOption[] = [
   },
 ];
 
-const NewAttachmentPanel = () => {
+const AttachmentPanel = () => {
   const vm = useAttachmentVM();
   const [errorMessage, setErrorMessage] = React.useState<string>();
   const [file, setFile] = React.useState<File>();
@@ -56,6 +58,7 @@ const NewAttachmentPanel = () => {
     React.useState<axa_attachment_axa_attachment_axa_type>();
   const [isLoading, { setTrue: startLoading, setFalse: stopLoading }] =
     useBoolean(false);
+  const [fileName, setFileName] = React.useState<string>();
 
   const onTypeSelectHandler = (
     _event: React.FormEvent<HTMLDivElement>,
@@ -84,8 +87,10 @@ const NewAttachmentPanel = () => {
         if (ev.target.files) {
           console.log("theres files");
           setFile(ev.target.files[0]);
+          setFileName(ev.target.files[0].name);
         } else {
           setFile(undefined);
+          setFileName(undefined);
         }
       };
 
@@ -102,19 +107,54 @@ const NewAttachmentPanel = () => {
   };
 
   const onSaveButtonClickHandler = async () => {
-    console.dir(file);
-    console.dir(typeInput);
-    console.log(file && typeInput);
-    if (file && typeInput) {
-      startLoading();
-      await vm.uploadFile(file, typeInput);
-      setFile(undefined);
-      setTypeInput(undefined);
-      setErrorMessage(undefined);
-      stopLoading();
-      vm.isPanelOpen = false;
+    if (vm.formType === "new") {
+      if (file && typeInput) {
+        startLoading();
+        await vm.uploadFile(typeInput, file);
+        setFile(undefined);
+        setFileName(undefined);
+        setTypeInput(undefined);
+        setErrorMessage(undefined);
+        stopLoading();
+        vm.isPanelOpen = false;
+      }
+      setErrorMessage("Please select a file and type");
+    } else if (vm.formType === "edit") {
+      if (file && typeInput) {
+        startLoading();
+        await vm.uploadFile(typeInput, file);
+        setFile(undefined);
+        setFileName(undefined);
+        setTypeInput(undefined);
+        setErrorMessage(undefined);
+        stopLoading();
+        vm.isPanelOpen = false;
+      } else if (typeInput) {
+        startLoading();
+        await vm.uploadFile(typeInput);
+        setFile(undefined);
+        setFileName(undefined);
+        setTypeInput(undefined);
+        setErrorMessage(undefined);
+        stopLoading();
+        vm.isPanelOpen = false;
+      }
+      setErrorMessage("Please select a file and type");
     }
-    setErrorMessage("Please select a file and type");
+  };
+
+  React.useEffect(() => {
+    console.log("useEffect ran");
+    if (vm.formType === "edit") {
+      console.log("vm.formType", vm.formType);
+      fetchData();
+    }
+  }, [vm.isPanelOpen]);
+
+  const fetchData = async () => {
+    let selected = vm.selectedAttachments[0];
+    setTypeInput(selected.type);
+    setFileName(selected.fileName);
   };
 
   const onRenderFooterContent = () => (
@@ -128,6 +168,7 @@ const NewAttachmentPanel = () => {
       <DefaultButton
         onClick={() => {
           setFile(undefined);
+          setFileName(undefined);
           setTypeInput(undefined);
           setErrorMessage(undefined);
           vm.isPanelOpen = false;
@@ -141,15 +182,20 @@ const NewAttachmentPanel = () => {
   return (
     <div>
       <Panel
-        headerText='Create New Attachment'
+        headerText={
+          vm.formType === "new" ? "New Attachment" : "Edit Attachment"
+        }
         isOpen={vm.isPanelOpen}
         onOpen={() => {
           setFile(undefined);
+          setFileName(undefined);
           setTypeInput(undefined);
           setErrorMessage(undefined);
         }}
+        headerTextProps={{ style: { marginBottom: "2em" } }}
         onDismiss={() => {
           setFile(undefined);
+          setFileName(undefined);
           setTypeInput(undefined);
           setErrorMessage(undefined);
           vm.isPanelOpen = false;
@@ -159,8 +205,18 @@ const NewAttachmentPanel = () => {
         closeButtonAriaLabel='Close'
         isFooterAtBottom={true}
       >
-        <Stack horizontal>
-          <Stack.Item grow={1}>
+        <Stack className={styles["dropdown-container"]} horizontal>
+          {vm.formType === "edit" ? (
+            <Dropdown
+              placeholder='Choose Type'
+              selectedKey={typeInput}
+              options={typeOptions}
+              onChange={(e, option?) => {
+                setErrorMessage(undefined);
+                onTypeSelectHandler(e, option);
+              }}
+            />
+          ) : (
             <Dropdown
               placeholder='Choose Type'
               options={typeOptions}
@@ -169,16 +225,17 @@ const NewAttachmentPanel = () => {
                 onTypeSelectHandler(e, option);
               }}
             />
-          </Stack.Item>
-          <Stack.Item grow={1}>
-            <DefaultButton
-              text={file ? file.name : "Select File"}
-              onClick={e => {
-                setErrorMessage(undefined);
-                onFileInputChangeHandler(e);
-              }}
-            />
-          </Stack.Item>
+          )}
+        </Stack>
+        <Stack className={styles["dropdown-container"]} horizontal>
+          <DefaultButton
+            onClick={e => {
+              setErrorMessage(undefined);
+              onFileInputChangeHandler(e);
+            }}
+          >
+            <Text nowrap>{fileName ? fileName : "Select File"}</Text>
+          </DefaultButton>
         </Stack>
         {errorMessage && (
           <MessageBar
@@ -204,4 +261,4 @@ const NewAttachmentPanel = () => {
   );
 };
 
-export default observer(NewAttachmentPanel);
+export default observer(AttachmentPanel);

@@ -4,6 +4,7 @@ import {
   TooltipHost,
   Selection,
   ICommandBarItemProps,
+  Link,
 } from "@fluentui/react";
 import { makeAutoObservable } from "mobx";
 import { ServiceProvider } from "pcf-react";
@@ -15,6 +16,8 @@ import { Attachment } from "../types/Attachment";
 import styles from "../Components/App.module.css";
 import { copyAndSort, fileIconLink } from "../utils/utils";
 import { axa_rfestatus } from "../cds-generated/enums/axa_rfestatus";
+import { axa_attachmentMetadata } from "../cds-generated/entities/axa_Attachment";
+import { FileToDownload } from "../types/FileToDownload";
 
 export interface IRow {
   key: string;
@@ -39,6 +42,7 @@ export default class AttachmentVM {
   public isLoading: boolean = false;
   public error: Error;
   public isDeleteDialogOpen: boolean = false;
+  public formType: "new" | "edit";
   public selection = new Selection({
     onSelectionChanged: () => {
       this.farCommandBarItems[0].disabled =
@@ -71,9 +75,9 @@ export default class AttachmentVM {
 
   public fetchData = async () => {
     this.isLoading = true;
-    const [result1, result2] = await Promise.allSettled([
+    const [result1] = await Promise.allSettled([
       this.cdsService.retrieveAttachmentByRfeId(this.rfeGuid),
-      this.cdsService.retrieveRfeStatus(this.rfeGuid),
+      this.fetchRfeStatus,
     ]);
     if (result1.status === "fulfilled") {
       const result = result1.value;
@@ -87,20 +91,97 @@ export default class AttachmentVM {
       this.isLoading = false;
       this.populateUI();
     }
-    if (result2.status === "fulfilled") {
-      const result = result2.value;
-      if (result instanceof Error) {
-        console.error(result.message);
-        this.isLoading = false;
-        this.error = result;
-        return;
-      }
-      this.isControlDisabled = result !== axa_rfestatus.Draft;
-      this.commandBarItems[0].disabled = this.isControlDisabled;
-      this.farCommandBarItems = [...this.farCommandBarItems];
-      this.isLoading = false;
-    }
   };
+
+  public async fetchRfeStatus() {
+    const result = await this.cdsService.retrieveRfeStatus(this.rfeGuid);
+    if (result instanceof Error) {
+      console.error(result.message);
+      this.isLoading = false;
+      this.error = result;
+      return;
+    }
+    this.isControlDisabled = result !== axa_rfestatus.Draft;
+    this.commandBarItems[0].disabled = this.isControlDisabled;
+    this.farCommandBarItems = [...this.farCommandBarItems];
+  }
+
+  public async getFile(attachmentId: string) {
+    const fileToDownload = await this.cdsService.getFile(attachmentId);
+
+    if (fileToDownload instanceof Error) {
+      console.error(fileToDownload.message);
+      this.isLoading = false;
+      this.error = fileToDownload;
+      return;
+    }
+    this.downloadFile(fileToDownload);
+
+    // try {
+    //   const result = await this.cdsService.getFile(attachmentId);
+    //   if (result instanceof Error) {
+    //     console.error(result.message);
+    //     this.isLoading = false;
+    //     this.error = result;
+    //     return;
+    //   }
+    //   const fileURL = this.base64ToUrl(result, "application/pdf");
+    //   window.open(fileURL);
+    // } catch (error) {
+    //   console.error(error);
+    // }
+  }
+
+  public downloadFile(fileToDownload: FileToDownload) {
+    console.dir(fileToDownload);
+    const fileURL = this.base64ToUrl(
+      fileToDownload.fileContent,
+      fileToDownload.mimeType
+    );
+    console.log(fileURL);
+    window.open(fileURL);
+  }
+
+  public base64ToUrl(base64: string, type: string) {
+    const blob = this.base64ToBlob(base64, type);
+    const url = URL.createObjectURL(blob);
+    return url;
+  }
+
+  public base64toPdfUrl(data: string, contentType: string): string {
+    const bString = window.atob(data);
+    const bLength = bString.length;
+    const bytes = new Uint8Array(bLength);
+    for (let i = 0; i < bLength; i++) {
+      let ascii = bString.charCodeAt(i);
+      bytes[i] = ascii;
+    }
+    const bufferArray = bytes;
+    const blobStore = new Blob([bufferArray], { type: contentType });
+    const file = window.URL.createObjectURL(blobStore);
+    return file;
+  }
+
+  public base64ToBlob(base64Content: string, contentType: string) {
+    const sliceSize = 512;
+    const byteCharacters = atob(base64Content);
+    const byteArrays = [];
+
+    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
+      const slice = byteCharacters.slice(offset, offset + sliceSize);
+
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) {
+        byteNumbers[i] = slice.charCodeAt(i);
+      }
+
+      const byteArray = new Uint8Array(byteNumbers);
+      byteArrays.push(byteArray);
+    }
+
+    const blob = new Blob(byteArrays, { type: contentType });
+    return blob;
+  }
 
   public populateUI = () => {
     const _items: IRow[] = [];
@@ -108,11 +189,9 @@ export default class AttachmentVM {
       _items.push({
         key: attachment.attachmentId?.id || "",
         type: axa_attachment_axa_attachment_axa_type[attachment.type],
-        fileName: this.cdsService.TrimFileExtension(
-          attachment.file?.name || ""
-        ),
+        fileName: this.cdsService.TrimFileExtension(attachment.fileName),
         iconSource: fileIconLink(
-          this.cdsService.GetFileExtension(attachment.extension || "")
+          this.cdsService.GetFileExtension(attachment.fileName)
         ).url,
       });
     });
@@ -147,6 +226,24 @@ export default class AttachmentVM {
         key: "column2",
         name: "Type",
         fieldName: "type",
+        minWidth: 50,
+        maxWidth: 75,
+        isRowHeader: true,
+        isResizable: true,
+        isSorted: true,
+        isSortedDescending: false,
+        sortAscendingAriaLabel: "Sorted A to Z",
+        sortDescendingAriaLabel: "Sorted Z to A",
+        onColumnClick: (_ev, column) => {
+          this.onColumnClick("type", column);
+        },
+        data: "string",
+        isPadded: true,
+      },
+      {
+        key: "column3",
+        name: "File Name",
+        fieldName: "fileName",
         minWidth: 210,
         maxWidth: 350,
         isRowHeader: true,
@@ -155,7 +252,14 @@ export default class AttachmentVM {
         isSortedDescending: false,
         sortAscendingAriaLabel: "Sorted A to Z",
         sortDescendingAriaLabel: "Sorted Z to A",
-        onColumnClick: this.onColumnClick,
+        onColumnClick: (_ev, column) => {
+          this.onColumnClick("fileName", column);
+        },
+        onRender: (item: IRow) => (
+          <Link href='' onClick={() => this.getFile(item.key)}>
+            {item.fileName}
+          </Link>
+        ),
         data: "string",
         isPadded: true,
       },
@@ -168,6 +272,7 @@ export default class AttachmentVM {
         iconProps: { iconName: "Add" },
         disabled: this.isControlDisabled,
         onClick: () => {
+          this.formType = "new";
           this.isPanelOpen = true;
         },
       },
@@ -189,17 +294,34 @@ export default class AttachmentVM {
   };
 
   public uploadFile = async (
-    file: File,
-    type: axa_attachment_axa_attachment_axa_type
+    type: axa_attachment_axa_attachment_axa_type,
+    file?: File
   ) => {
+    await this.fetchRfeStatus();
     this.isLoading = true;
-    await this.cdsService.handleFiles({
-      file,
-      type,
-      entityId: this.rfeGuid,
-      entityLogicalName: axa_requestforexpenditureMetadata.logicalName,
-    });
-    this.fetchData();
+    if (this.formType === "new" && file) {
+      await this.cdsService.createFiles({
+        file,
+        type,
+        entityId: this.rfeGuid,
+        entityLogicalName: axa_requestforexpenditureMetadata.logicalName,
+      });
+    } else {
+      if (file && type) {
+        await this.cdsService.updateFile({
+          file,
+          type,
+          attachmentId: this.selectedAttachments[0].attachmentId.id || "",
+        });
+      } else {
+        await this.cdsService.updateFile({
+          type,
+          attachmentId: this.selectedAttachments[0].attachmentId.id || "",
+        });
+      }
+    }
+    await this.fetchData();
+    this.selection.setIndexSelected(0, false, false);
   };
 
   public toggleDeleteDialog = () => {
@@ -207,21 +329,19 @@ export default class AttachmentVM {
   };
 
   public deleteSelectedAttachments = async () => {
+    await this.fetchRfeStatus();
     this.isLoading = true;
     await this.cdsService.deleteAttachments(this.selectedAttachments);
     await this.fetchData();
   };
 
-  public onColumnClick = (
-    _ev: React.MouseEvent<HTMLElement>,
-    column: IColumn
-  ) => {
+  public onColumnClick = (_columnKey: string, column: IColumn) => {
     const newColumns: IColumn[] = this.listColumns.slice();
-    const currColumn: IColumn = newColumns.filter(
+    const currColumn: IColumn = newColumns.find(
       currCol => column.key === currCol.key
-    )[0];
+    ) as IColumn;
     newColumns.forEach((newCol: IColumn) => {
-      if (newCol === currColumn) {
+      if (newCol.key === currColumn.key) {
         currColumn.isSortedDescending = !currColumn.isSortedDescending;
         currColumn.isSorted = true;
       } else {

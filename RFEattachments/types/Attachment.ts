@@ -7,12 +7,14 @@ export class Attachment {
   type: axa_attachment_axa_attachment_axa_type;
   rfe: EntityReference;
   file: File;
+  fileName: string;
   constructor({
     attachmentId,
     extension,
     type,
     rfe,
     file,
+    fileName,
   }: {
     attachmentId: EntityReference;
     fileType?: string;
@@ -20,11 +22,13 @@ export class Attachment {
     type: axa_attachment_axa_attachment_axa_type;
     rfe: EntityReference;
     file: File;
+    fileName: string;
   }) {
     this.attachmentId = attachmentId;
     this.extension = extension;
     this.type = type;
     this.rfe = rfe;
     this.file = file;
+    this.fileName = fileName;
   }
 }

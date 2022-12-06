@@ -15,7 +15,7 @@ import { observer } from "mobx-react-lite";
 import { useBoolean } from "@fluentui/react-hooks";
 import * as React from "react";
 import { useAttachmentVM } from "../Context/context";
-import NewAttachmentPanel from "./NewAttachmentPanel";
+import AttachmentPanel from "./AttachmentPanel";
 import styles from "./App.module.css";
 
 interface props {}
@@ -37,7 +37,7 @@ const Actions = ({}: props) => {
   return (
     <>
       <CommandBar items={vm.commandBarItems} farItems={vm.farCommandBarItems} />
-      <NewAttachmentPanel />
+      <AttachmentPanel />
       <Dialog
         hidden={!vm.isDeleteDialogOpen}
         onDismiss={() => {

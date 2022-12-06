@@ -16,18 +16,41 @@ export default class CdsService {
     this.context = context;
   }
 
-  public async retrieveFileToDownload(attachmentId: string) {
-    const result = await this.context.webAPI.retrieveRecord(
-      "annotation",
-      attachmentId
-    );
-    let file: FileToDownload = new FileToDownload();
-    file.fileContent =
-      result.entityType == "annotation" ? result.documentbody : result.body;
-    file.fileName = result.filename;
-    file.fileSize = result.filesize;
-    file.mimeType = result.mimetype;
-    return file;
+  public async getFile(attachmentId: string) {
+    try {
+      const fileToDownload: FileToDownload = new FileToDownload();
+      const fileIdRes = await this.context.webAPI.retrieveRecord(
+        axa_attachmentMetadata.logicalName,
+        attachmentId,
+        "?$select=axa_file"
+      );
+      const [result, result1] = await Promise.allSettled([
+        fetch(
+          "https://axagdev1.crm.dynamics.com/api/data/v9.0/fileattachments?$filter=fileattachmentid eq " +
+            fileIdRes.axa_file,
+          {
+            method: "GET",
+          }
+        ),
+        fetch("/api/data/v9.1/axa_attachments(" + attachmentId + ")/axa_file", {
+          method: "GET",
+        }),
+      ]);
+      if (result.status === "fulfilled" && result1.status === "fulfilled") {
+        const res = await result.value.json();
+        const res1 = await result1.value.json();
+        console.dir(res1);
+
+        fileToDownload.mimeType = res.value[0].mimetype;
+        fileToDownload.fileName = res.value[0].filename;
+        fileToDownload.fileContent = res1.value;
+        fileToDownload.fileSize = res.value[0].filesizeinbytes;
+      }
+      return fileToDownload;
+    } catch (e: any) {
+      console.error(e.message);
+      return new Error(e.message);
+    }
   }
 
   public async retrieveRfeStatus(
@@ -62,6 +85,7 @@ export default class CdsService {
             <attribute name="axa_rfe" />
             <attribute name="axa_attachmentid" />
             <attribute name="axa_name" />
+            <attribute name="axa_file_name" />
             <filter>
               <condition attribute="axa_rfe" operator="eq" value="${rfeId}" />
               <condition attribute="axa_file" operator="not-null" />
@@ -94,7 +118,8 @@ export default class CdsService {
             attachment.axa_rfe?.id,
             attachment.axa_rfe?.name
           ),
-          file: attachment.axa_file,
+          file: {} as File,
+          fileName: attachment.axa_file_name || "",
           extension: this.GetFileExtension(attachment.axa_file_name || ""),
         });
         return newAttachment;
@@ -107,7 +132,7 @@ export default class CdsService {
     }
   }
 
-  public async handleFiles({
+  public async createFiles({
     file,
     type,
     entityId,
@@ -124,6 +149,7 @@ export default class CdsService {
       rfe: new EntityReference(entityLogicalName, entityId),
       extension: this.GetFileExtension(file.name),
       file: file,
+      fileName: file.name,
     });
 
     const encodedData = await this.EncodeFile(file);
@@ -155,17 +181,21 @@ export default class CdsService {
             method: "PATCH",
             headers: {
               Accept: "/",
-              "Content-Type": "application/octet-stream",
-              Prefer: 'odata.include-annotations="*"',
-              "OData-Version": "4.0",
+              "Content-Type": "application/",
             },
             body: encodedData,
           }
         );
-        if (!response.ok) {
-          console.error(response.statusText);
-          return new Error(response.statusText);
-        }
+        // const response = await this.context.webAPI.updateRecord(
+        //   axa_attachmentMetadata.logicalName,
+        //   attachment.attachmentId.id,
+        //   {
+        //     axa_file: encodedData,
+        //   }
+        // );
+        // if (!response) {
+        //   return new Error("No response from CDS");
+        // }
       } catch (e: any) {
         console.error(e.message);
         return new Error(e.message);
@@ -177,6 +207,73 @@ export default class CdsService {
     );
 
     return attachment;
+  }
+
+  public async updateFile({
+    file,
+    type,
+    attachmentId,
+  }: {
+    file?: File;
+    type: axa_attachment_axa_attachment_axa_type;
+    attachmentId: string;
+  }): Promise<void | Error> {
+    if (file) {
+      const encodedData = await this.EncodeFile(file);
+      try {
+        const [response1, response2] = await Promise.allSettled([
+          fetch(
+            `/api/data/v9.1/axa_attachments(${attachmentId})/axa_file?x-ms-file-name=${file.name}`,
+            {
+              method: "PATCH",
+              headers: {
+                Accept: "/",
+                "Content-Type": "application/octet-stream",
+                Prefer: 'odata.include-annotations="*"',
+                "OData-Version": "4.0",
+              },
+              body: encodedData,
+            }
+          ),
+          this.context.webAPI.updateRecord(
+            axa_attachmentMetadata.logicalName,
+            attachmentId,
+            { axa_type: type }
+          ),
+        ]);
+        if (
+          response1.status === "fulfilled" &&
+          response2.status === "fulfilled"
+        ) {
+          if (!response1.value.ok) {
+            console.error(response1.value.statusText);
+            return new Error(response1.value.statusText);
+          }
+          if (!response2.value) {
+            console.error("No response from CDS");
+            return new Error("No response from CDS");
+          }
+        }
+      } catch (e: any) {
+        console.error(e.message);
+        return new Error(e.message);
+      }
+    } else {
+      try {
+        const response = await this.context.webAPI.updateRecord(
+          axa_attachmentMetadata.logicalName,
+          attachmentId,
+          { axa_type: type }
+        );
+        if (!response) {
+          console.error("No response from CDS");
+          return new Error("No response from CDS");
+        }
+      } catch (e: any) {
+        console.error(e.message);
+        return new Error(e.message);
+      }
+    }
   }
 
   public async deleteAttachments(attachments: Attachment[]) {
@@ -207,19 +304,16 @@ export default class CdsService {
     }
   }
 
-  public toBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = error => reject(error);
-    });
-  }
-
   public EncodeFile(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = _f => resolve((<string>reader.result).split(",")[1]);
+      reader.onload = _f => {
+        console.dir(reader);
+        let res = (<string>reader.result).split(",")[1];
+        res = encodeURIComponent(res);
+        console.log(res);
+        resolve(res);
+      };
       reader.onerror = error => reject(error);
       reader.readAsDataURL(file);
     });
