@@ -378,7 +378,7 @@ export default class CdsService {
         } else {
           // error happened.
           // log error and take necessary action.
-          console.log("error happened");
+          console.error("error happened");
           return new Error("error happened" + response.status);
         }
       }

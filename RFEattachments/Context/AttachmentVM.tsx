@@ -284,7 +284,7 @@ export default class AttachmentVM {
       this.selection.setIndexSelected(0, false, false);
       return;
     } catch (error) {
-      console.log(error);
+      console.error(error);
     }
     await this.fetchData();
   };
