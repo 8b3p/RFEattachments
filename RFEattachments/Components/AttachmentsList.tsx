@@ -27,8 +27,10 @@ const AttachmentsList = () => {
           selection={vm.selection}
           selectionPreservedOnEmptyClick={true}
           onItemInvoked={() => {
-            vm.formType = "edit";
-            vm.isPanelOpen = true;
+            if (!vm.isControlDisabled) {
+              vm.formType = "edit";
+              vm.isPanelOpen = true;
+            }
           }}
           enterModalSelectionOnTouch={true}
           ariaLabelForSelectionColumn='Toggle selection'

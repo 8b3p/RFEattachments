@@ -6,6 +6,8 @@ import {
   DialogType,
   FocusTrapZone,
   Layer,
+  MessageBar,
+  MessageBarType,
   Overlay,
   PrimaryButton,
   Spinner,
@@ -29,12 +31,22 @@ const Actions = () => {
   const vm = useAttachmentVM();
   const [isLoading, { setTrue: startLoading, setFalse: stopLoading }] =
     useBoolean(false);
+  const [error, setError] = React.useState<string | undefined>(undefined);
 
   const modalProps = { isBlocking: false };
 
   return (
     <>
       <CommandBar items={vm.commandBarItems} farItems={vm.farCommandBarItems} />
+      {error && (
+        <MessageBar
+          messageBarType={MessageBarType.error}
+          onDismiss={() => setError(undefined)}
+          dismissButtonAriaLabel='Close'
+        >
+          {error}
+        </MessageBar>
+      )}
       <AttachmentPanel />
       <Dialog
         hidden={!vm.isDeleteDialogOpen}
@@ -57,9 +69,12 @@ const Actions = () => {
           <PrimaryButton
             onClick={async () => {
               startLoading();
-              await vm.deleteSelectedAttachments();
-              stopLoading();
               vm.toggleDeleteDialog();
+              let response = await vm.deleteSelectedAttachments();
+              stopLoading();
+              if (response instanceof Error) {
+                setError(response.message);
+              }
             }}
             text='Delete'
           />

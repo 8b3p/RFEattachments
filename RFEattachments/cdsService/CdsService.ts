@@ -9,6 +9,7 @@ import { axa_rfestatus } from "../cds-generated/enums/axa_rfestatus";
 import { IInputs } from "../generated/ManifestTypes";
 import { Attachment } from "../types/Attachment";
 import { FileToDownload } from "../types/FileToDownload";
+import { EncodeFile, GetFileExtension } from "../utils/utils";
 
 export default class CdsService {
   context: ComponentFramework.Context<IInputs>;
@@ -16,7 +17,7 @@ export default class CdsService {
     this.context = context;
   }
 
-  public async getFile(attachmentId: string) {
+  public async retrieveFile(attachmentId: string) {
     try {
       const fileToDownload: FileToDownload = new FileToDownload();
       const fileIdRes = await this.context.webAPI.retrieveRecord(
@@ -87,7 +88,6 @@ export default class CdsService {
             <attribute name="axa_file_name" />
             <filter>
               <condition attribute="axa_rfe" operator="eq" value="${rfeId}" />
-              <condition attribute="axa_file" operator="not-null" />
             </filter>
           </entity>
         </fetch>
@@ -117,9 +117,9 @@ export default class CdsService {
             attachment.axa_rfe?.id,
             attachment.axa_rfe?.name
           ),
-          file: {} as File,
+          isThereFile: attachment.axa_file ? true : false,
           fileName: attachment.axa_file_name || "",
-          extension: this.GetFileExtension(attachment.axa_file_name || ""),
+          extension: GetFileExtension(attachment.axa_file_name || ""),
         });
         return newAttachment;
       });
@@ -130,7 +130,7 @@ export default class CdsService {
     }
   }
 
-  public async createFiles({
+  public async createFile({
     file,
     type,
     entityId,
@@ -145,8 +145,8 @@ export default class CdsService {
       attachmentId: new EntityReference(axa_attachmentMetadata.logicalName, ""),
       type: type,
       rfe: new EntityReference(entityLogicalName, entityId),
-      extension: this.GetFileExtension(file.name),
-      file: file,
+      extension: GetFileExtension(file.name),
+      isThereFile: false,
       fileName: file.name,
     });
 
@@ -178,6 +178,7 @@ export default class CdsService {
         console.error(response.message);
         return response;
       }
+      attachment.isThereFile = true;
     } catch (e: any) {
       console.error(e.message);
       return new Error(e.message);
@@ -196,7 +197,7 @@ export default class CdsService {
     attachmentId: string;
   }): Promise<void | Error> {
     if (file) {
-      const encodedData = await this.EncodeFile(file);
+      const encodedData = await EncodeFile(file);
       try {
         const [response1, response2] = await Promise.allSettled([
           this.uploadFile(
@@ -245,14 +246,14 @@ export default class CdsService {
     }
   }
 
-  public async uploadFile(
+  private async uploadFile(
     file: File,
     entityId: string,
     entitySetName: string
   ): Promise<"success" | Error> {
     try {
       const fileName = file.name;
-      const array = await this.EncodeFile(file);
+      const array = await EncodeFile(file);
       const url =
         parent.Xrm.Utility.getGlobalContext().getClientUrl() +
         "/api/data/v9.1/" +
@@ -282,7 +283,7 @@ export default class CdsService {
     }
   }
 
-  public async makeRequest({
+  private async makeRequest({
     method,
     fileName,
     url,
@@ -334,7 +335,7 @@ export default class CdsService {
     });
   }
 
-  public async fileChunckUpload({
+  private async fileChunckUpload({
     response,
     fileName,
     fileBytes,
@@ -409,37 +410,6 @@ export default class CdsService {
       console.error(e.message);
       return new Error(e.message);
     }
-  }
-
-  public EncodeFile(file: File): Promise<Uint8Array> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const arrayBuffer = reader.result as ArrayBuffer;
-        const array = new Uint8Array(arrayBuffer);
-
-        // this is the first request. We are passing content as null.
-        resolve(array);
-      };
-      reader.onerror = error => reject(error);
-      reader.readAsArrayBuffer(file);
-    });
-  }
-
-  public CollectionNameFromLogicalName(entityLogicalName: string): string {
-    if (entityLogicalName[entityLogicalName.length - 1] != "s") {
-      return `${entityLogicalName}s`;
-    } else {
-      return `${entityLogicalName}es`;
-    }
-  }
-
-  public GetFileExtension(fileName: string): string {
-    return <string>fileName.split(".").pop();
-  }
-
-  public TrimFileExtension(fileName: string): string {
-    return <string>fileName.split(".")[0];
   }
 }
 

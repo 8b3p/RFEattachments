@@ -14,7 +14,13 @@ import CdsService, { cdsServiceName } from "../cdsService/CdsService";
 import { IInputs } from "../generated/ManifestTypes";
 import { Attachment } from "../types/Attachment";
 import styles from "../Components/App.module.css";
-import { copyAndSort, fileIconLink } from "../utils/utils";
+import {
+  base64ToUrl,
+  copyAndSort,
+  fileIconLink,
+  GetFileExtension,
+  TrimFileExtension,
+} from "../utils/utils";
 import { axa_rfestatus } from "../cds-generated/enums/axa_rfestatus";
 import { FileToDownload } from "../types/FileToDownload";
 
@@ -74,6 +80,7 @@ export default class AttachmentVM {
 
   public fetchData = async () => {
     this.isLoading = true;
+    await this.fetchRfeStatus();
     const [result1] = await Promise.allSettled([
       this.cdsService.retrieveAttachmentByRfeId(this.rfeGuid),
       this.fetchRfeStatus,
@@ -101,59 +108,30 @@ export default class AttachmentVM {
       return;
     }
     this.isControlDisabled = result !== axa_rfestatus.Draft;
-    this.commandBarItems[0].disabled = this.isControlDisabled;
-    this.farCommandBarItems = [...this.farCommandBarItems];
+    if (this.farCommandBarItems && this.farCommandBarItems.length > 0) {
+      this.farCommandBarItems[0].disabled = this.isControlDisabled;
+      this.farCommandBarItems = [...this.farCommandBarItems];
+    }
   }
 
   public async getFile(attachmentId: string) {
     try {
-      const fileToDownload = await this.cdsService.getFile(attachmentId);
+      const fileToDownload = await this.cdsService.retrieveFile(attachmentId);
       if (fileToDownload instanceof Error) {
         console.error(fileToDownload.message);
         this.isLoading = false;
         this.error = fileToDownload;
         return;
       }
-      this.downloadFile(fileToDownload);
+      const fileURL = base64ToUrl(
+        fileToDownload.fileContent,
+        fileToDownload.mimeType
+      );
+      //download the file
+      window.open(fileURL, "_blank");
     } catch (error) {
       console.error(error);
     }
-  }
-
-  public downloadFile(fileToDownload: FileToDownload) {
-    const fileURL = this.base64ToUrl(
-      fileToDownload.fileContent,
-      fileToDownload.mimeType
-    );
-    //download the file
-    window.open(fileURL, "_blank");
-  }
-
-  public base64ToUrl(base64: string, type: string) {
-    const blob = this.base64ToBlob(base64, type);
-    const url = URL.createObjectURL(blob);
-    return url;
-  }
-
-  public base64ToBlob(base64Content: string, contentType: string) {
-    const sliceSize = 512;
-    const byteCharacters = atob(base64Content);
-    const byteArrays = [];
-
-    for (let offset = 0; offset < byteCharacters.length; offset += sliceSize) {
-      const slice = byteCharacters.slice(offset, offset + sliceSize);
-
-      const byteNumbers = new Array(slice.length);
-      for (let i = 0; i < slice.length; i++) {
-        byteNumbers[i] = slice.charCodeAt(i);
-      }
-
-      const byteArray = new Uint8Array(byteNumbers);
-      byteArrays.push(byteArray);
-    }
-
-    const blob = new Blob(byteArrays, { type: contentType });
-    return blob;
   }
 
   public populateUI = () => {
@@ -162,10 +140,10 @@ export default class AttachmentVM {
       _items.push({
         key: attachment.attachmentId?.id || "",
         type: axa_attachment_axa_attachment_axa_type[attachment.type],
-        fileName: this.cdsService.TrimFileExtension(attachment.fileName),
-        iconSource: fileIconLink(
-          this.cdsService.GetFileExtension(attachment.fileName)
-        ).url,
+        fileName: attachment.isThereFile
+          ? TrimFileExtension(attachment.fileName)
+          : "",
+        iconSource: fileIconLink(GetFileExtension(attachment.fileName)).url,
       });
     });
     this.listItems = _items;
@@ -228,11 +206,17 @@ export default class AttachmentVM {
         onColumnClick: (_ev, column) => {
           this.onColumnClick("fileName", column);
         },
-        onRender: (item: IRow) => (
-          <Link href='' onClick={() => this.getFile(item.key)}>
-            {item.fileName}
-          </Link>
-        ),
+        onRender: (item: IRow) => {
+          if (item.fileName === "") {
+            return <></>;
+          }
+          return (
+            <Link href='' onClick={() => this.getFile(item.key)}>
+              {item.fileName}
+            </Link>
+          );
+        },
+
         data: "string",
         isPadded: true,
       },
@@ -243,7 +227,6 @@ export default class AttachmentVM {
         text: "New",
         cacheKey: "myCacheKey", // changing this key will invalidate this item's cache
         iconProps: { iconName: "Add" },
-        disabled: this.isControlDisabled,
         onClick: () => {
           this.formType = "new";
           this.isPanelOpen = true;
@@ -273,26 +256,28 @@ export default class AttachmentVM {
     try {
       this.isLoading = true;
       if (this.formType === "new" && file) {
-        await this.cdsService.createFiles({
+        await this.cdsService.createFile({
           file,
           type,
           entityId: this.rfeGuid,
           entityLogicalName: axa_requestforexpenditureMetadata.logicalName,
         });
       } else {
-        if (!this.isControlDisabled) {
-          if (file && type) {
-            await this.cdsService.updateFile({
-              file,
-              type,
-              attachmentId: this.selectedAttachments[0].attachmentId.id || "",
-            });
-          } else {
-            await this.cdsService.updateFile({
-              type,
-              attachmentId: this.selectedAttachments[0].attachmentId.id || "",
-            });
-          }
+        if (this.isControlDisabled) {
+          this.fetchData();
+          return new Error("Control is disabled");
+        }
+        if (file && type) {
+          await this.cdsService.updateFile({
+            file,
+            type,
+            attachmentId: this.selectedAttachments[0].attachmentId.id || "",
+          });
+        } else {
+          await this.cdsService.updateFile({
+            type,
+            attachmentId: this.selectedAttachments[0].attachmentId.id || "",
+          });
         }
       }
       await this.fetchData();
@@ -310,6 +295,10 @@ export default class AttachmentVM {
 
   public deleteSelectedAttachments = async () => {
     await this.fetchRfeStatus();
+    if (this.isControlDisabled) {
+      this.fetchData();
+      return new Error("You can't delete attachments on a submitted RFE");
+    }
     this.isLoading = true;
     await this.cdsService.deleteAttachments(this.selectedAttachments);
     await this.fetchData();
