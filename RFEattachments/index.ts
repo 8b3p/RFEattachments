@@ -9,6 +9,7 @@ import { IInputs, IOutputs } from "./generated/ManifestTypes";
 export class RFEattachments extends StandardControlReact<IInputs, IOutputs> {
   constructor() {
     super();
+    console.info("v1.0.0 (2021-03-31)");
     this.renderOnParametersChanged = false;
     this.initServiceProvider = (serviceProvider: ServiceProvider) => {
       serviceProvider.register("context", this.context);

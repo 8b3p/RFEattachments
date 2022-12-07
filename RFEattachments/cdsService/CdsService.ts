@@ -39,7 +39,6 @@ export default class CdsService {
       if (result.status === "fulfilled" && result1.status === "fulfilled") {
         const res = await result.value.json();
         const res1 = await result1.value.json();
-        console.dir(res1);
 
         fileToDownload.mimeType = res.value[0].mimetype;
         fileToDownload.fileName = attachmentId;
@@ -124,7 +123,6 @@ export default class CdsService {
         });
         return newAttachment;
       });
-      console.dir(attachments);
 
       return attachments;
     } else {
@@ -143,7 +141,6 @@ export default class CdsService {
     entityId: string;
     entityLogicalName: string;
   }): Promise<"success" | Error> {
-    console.dir(file);
     const attachment = new Attachment({
       attachmentId: new EntityReference(axa_attachmentMetadata.logicalName, ""),
       type: type,
@@ -181,15 +178,10 @@ export default class CdsService {
         console.error(response.message);
         return response;
       }
-      console.info("File uploaded successfully");
     } catch (e: any) {
       console.error(e.message);
       return new Error(e.message);
     }
-
-    console.log(
-      `Attachment: ${file.name} has been uploaded to ${entityLogicalName} with id: ${entityId}`
-    );
 
     return "success";
   }
@@ -408,11 +400,8 @@ export default class CdsService {
           );
         })
       );
-      response.forEach((result, index) => {
+      response.forEach((result, _index) => {
         if (result.status === "fulfilled") {
-          console.log(
-            `Attachment: ${attachments[index].attachmentId.id} has been deleted`
-          );
         } else {
           console.error(result.reason);
         }

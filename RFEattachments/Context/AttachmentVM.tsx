@@ -125,7 +125,6 @@ export default class AttachmentVM {
       fileToDownload.fileContent,
       fileToDownload.mimeType
     );
-    console.log(fileURL);
     //download the file
     window.open(fileURL, "_blank");
   }

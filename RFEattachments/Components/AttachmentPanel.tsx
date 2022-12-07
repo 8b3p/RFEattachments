@@ -85,7 +85,6 @@ const AttachmentPanel = () => {
 
       inputElement.onchange = (ev: any) => {
         if (ev.target.files) {
-          console.log("theres files");
           setFile(ev.target.files[0]);
           setFileName(ev.target.files[0].name);
         } else {
@@ -144,9 +143,7 @@ const AttachmentPanel = () => {
   };
 
   React.useEffect(() => {
-    console.log("useEffect ran");
     if (vm.formType === "edit") {
-      console.log("vm.formType", vm.formType);
       fetchData();
     }
   }, [vm.isPanelOpen]);
