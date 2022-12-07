@@ -401,8 +401,7 @@ export default class CdsService {
         })
       );
       response.forEach((result, _index) => {
-        if (result.status === "fulfilled") {
-        } else {
+        if (result.status !== "fulfilled") {
           console.error(result.reason);
         }
       });
