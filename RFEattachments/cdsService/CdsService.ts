@@ -9,7 +9,6 @@ import { axa_rfestatus } from "../cds-generated/enums/axa_rfestatus";
 import { IInputs } from "../generated/ManifestTypes";
 import { Attachment } from "../types/Attachment";
 import { FileToDownload } from "../types/FileToDownload";
-import { uploadFile } from "../utils/utils";
 
 export default class CdsService {
   context: ComponentFramework.Context<IInputs>;
