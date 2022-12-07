@@ -16,7 +16,6 @@ import { Attachment } from "../types/Attachment";
 import styles from "../Components/App.module.css";
 import { copyAndSort, fileIconLink } from "../utils/utils";
 import { axa_rfestatus } from "../cds-generated/enums/axa_rfestatus";
-import { axa_attachmentMetadata } from "../cds-generated/entities/axa_Attachment";
 import { FileToDownload } from "../types/FileToDownload";
 
 export interface IRow {
@@ -107,59 +106,34 @@ export default class AttachmentVM {
   }
 
   public async getFile(attachmentId: string) {
-    const fileToDownload = await this.cdsService.getFile(attachmentId);
-
-    if (fileToDownload instanceof Error) {
-      console.error(fileToDownload.message);
-      this.isLoading = false;
-      this.error = fileToDownload;
-      return;
+    try {
+      const fileToDownload = await this.cdsService.getFile(attachmentId);
+      if (fileToDownload instanceof Error) {
+        console.error(fileToDownload.message);
+        this.isLoading = false;
+        this.error = fileToDownload;
+        return;
+      }
+      this.downloadFile(fileToDownload);
+    } catch (error) {
+      console.error(error);
     }
-    this.downloadFile(fileToDownload);
-
-    // try {
-    //   const result = await this.cdsService.getFile(attachmentId);
-    //   if (result instanceof Error) {
-    //     console.error(result.message);
-    //     this.isLoading = false;
-    //     this.error = result;
-    //     return;
-    //   }
-    //   const fileURL = this.base64ToUrl(result, "application/pdf");
-    //   window.open(fileURL);
-    // } catch (error) {
-    //   console.error(error);
-    // }
   }
 
   public downloadFile(fileToDownload: FileToDownload) {
-    console.dir(fileToDownload);
     const fileURL = this.base64ToUrl(
       fileToDownload.fileContent,
       fileToDownload.mimeType
     );
     console.log(fileURL);
-    window.open(fileURL);
+    //download the file
+    window.open(fileURL, "_blank");
   }
 
   public base64ToUrl(base64: string, type: string) {
     const blob = this.base64ToBlob(base64, type);
     const url = URL.createObjectURL(blob);
     return url;
-  }
-
-  public base64toPdfUrl(data: string, contentType: string): string {
-    const bString = window.atob(data);
-    const bLength = bString.length;
-    const bytes = new Uint8Array(bLength);
-    for (let i = 0; i < bLength; i++) {
-      let ascii = bString.charCodeAt(i);
-      bytes[i] = ascii;
-    }
-    const bufferArray = bytes;
-    const blobStore = new Blob([bufferArray], { type: contentType });
-    const file = window.URL.createObjectURL(blobStore);
-    return file;
   }
 
   public base64ToBlob(base64Content: string, contentType: string) {
@@ -297,31 +271,38 @@ export default class AttachmentVM {
     type: axa_attachment_axa_attachment_axa_type,
     file?: File
   ) => {
-    await this.fetchRfeStatus();
-    this.isLoading = true;
-    if (this.formType === "new" && file) {
-      await this.cdsService.createFiles({
-        file,
-        type,
-        entityId: this.rfeGuid,
-        entityLogicalName: axa_requestforexpenditureMetadata.logicalName,
-      });
-    } else {
-      if (file && type) {
-        await this.cdsService.updateFile({
+    try {
+      this.isLoading = true;
+      if (this.formType === "new" && file) {
+        await this.cdsService.createFiles({
           file,
           type,
-          attachmentId: this.selectedAttachments[0].attachmentId.id || "",
+          entityId: this.rfeGuid,
+          entityLogicalName: axa_requestforexpenditureMetadata.logicalName,
         });
       } else {
-        await this.cdsService.updateFile({
-          type,
-          attachmentId: this.selectedAttachments[0].attachmentId.id || "",
-        });
+        if (!this.isControlDisabled) {
+          if (file && type) {
+            await this.cdsService.updateFile({
+              file,
+              type,
+              attachmentId: this.selectedAttachments[0].attachmentId.id || "",
+            });
+          } else {
+            await this.cdsService.updateFile({
+              type,
+              attachmentId: this.selectedAttachments[0].attachmentId.id || "",
+            });
+          }
+        }
       }
+      await this.fetchData();
+      this.selection.setIndexSelected(0, false, false);
+      return;
+    } catch (error) {
+      console.log(error);
     }
     await this.fetchData();
-    this.selection.setIndexSelected(0, false, false);
   };
 
   public toggleDeleteDialog = () => {

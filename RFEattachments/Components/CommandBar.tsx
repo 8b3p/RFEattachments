@@ -18,8 +18,6 @@ import { useAttachmentVM } from "../Context/context";
 import AttachmentPanel from "./AttachmentPanel";
 import styles from "./App.module.css";
 
-interface props {}
-
 const dialogContentProps = {
   type: DialogType.normal,
   title: "Delete Attachments",
@@ -27,7 +25,7 @@ const dialogContentProps = {
   subText: "Are you sure you want to delete the selected attachments?",
 };
 
-const Actions = ({}: props) => {
+const Actions = () => {
   const vm = useAttachmentVM();
   const [isLoading, { setTrue: startLoading, setFalse: stopLoading }] =
     useBoolean(false);

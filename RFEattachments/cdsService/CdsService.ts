@@ -9,6 +9,7 @@ import { axa_rfestatus } from "../cds-generated/enums/axa_rfestatus";
 import { IInputs } from "../generated/ManifestTypes";
 import { Attachment } from "../types/Attachment";
 import { FileToDownload } from "../types/FileToDownload";
+import { uploadFile } from "../utils/utils";
 
 export default class CdsService {
   context: ComponentFramework.Context<IInputs>;
@@ -42,7 +43,7 @@ export default class CdsService {
         console.dir(res1);
 
         fileToDownload.mimeType = res.value[0].mimetype;
-        fileToDownload.fileName = res.value[0].filename;
+        fileToDownload.fileName = attachmentId;
         fileToDownload.fileContent = res1.value;
         fileToDownload.fileSize = res.value[0].filesizeinbytes;
       }
@@ -142,7 +143,8 @@ export default class CdsService {
     type: axa_attachment_axa_attachment_axa_type;
     entityId: string;
     entityLogicalName: string;
-  }): Promise<Attachment | Error> {
+  }): Promise<"success" | Error> {
+    console.dir(file);
     const attachment = new Attachment({
       attachmentId: new EntityReference(axa_attachmentMetadata.logicalName, ""),
       type: type,
@@ -152,7 +154,6 @@ export default class CdsService {
       fileName: file.name,
     });
 
-    const encodedData = await this.EncodeFile(file);
     try {
       let data = {
         axa_type: type,
@@ -171,42 +172,27 @@ export default class CdsService {
       console.error(e.message);
       return new Error(e.message);
     }
-
-    //upload the file to the File field of the attachment
-    if (attachment.attachmentId.id) {
-      try {
-        const response = await fetch(
-          `/api/data/v9.1/axa_attachments(${attachment.attachmentId.id})/axa_file?x-ms-file-name=${file.name}`,
-          {
-            method: "PATCH",
-            headers: {
-              Accept: "/",
-              "Content-Type": "application/",
-            },
-            body: encodedData,
-          }
-        );
-        // const response = await this.context.webAPI.updateRecord(
-        //   axa_attachmentMetadata.logicalName,
-        //   attachment.attachmentId.id,
-        //   {
-        //     axa_file: encodedData,
-        //   }
-        // );
-        // if (!response) {
-        //   return new Error("No response from CDS");
-        // }
-      } catch (e: any) {
-        console.error(e.message);
-        return new Error(e.message);
+    try {
+      let response = await this.uploadFile(
+        file,
+        attachment.attachmentId.id,
+        axa_attachmentMetadata.collectionName
+      );
+      if (response instanceof Error) {
+        console.error(response.message);
+        return response;
       }
+      console.info("File uploaded successfully");
+    } catch (e: any) {
+      console.error(e.message);
+      return new Error(e.message);
     }
 
     console.log(
       `Attachment: ${file.name} has been uploaded to ${entityLogicalName} with id: ${entityId}`
     );
 
-    return attachment;
+    return "success";
   }
 
   public async updateFile({
@@ -222,18 +208,10 @@ export default class CdsService {
       const encodedData = await this.EncodeFile(file);
       try {
         const [response1, response2] = await Promise.allSettled([
-          fetch(
-            `/api/data/v9.1/axa_attachments(${attachmentId})/axa_file?x-ms-file-name=${file.name}`,
-            {
-              method: "PATCH",
-              headers: {
-                Accept: "/",
-                "Content-Type": "application/octet-stream",
-                Prefer: 'odata.include-annotations="*"',
-                "OData-Version": "4.0",
-              },
-              body: encodedData,
-            }
+          this.uploadFile(
+            file,
+            attachmentId,
+            axa_attachmentMetadata.collectionName
           ),
           this.context.webAPI.updateRecord(
             axa_attachmentMetadata.logicalName,
@@ -245,9 +223,9 @@ export default class CdsService {
           response1.status === "fulfilled" &&
           response2.status === "fulfilled"
         ) {
-          if (!response1.value.ok) {
-            console.error(response1.value.statusText);
-            return new Error(response1.value.statusText);
+          if (response1.value instanceof Error) {
+            console.error(response1.value.message);
+            return new Error(response1.value.message);
           }
           if (!response2.value) {
             console.error("No response from CDS");
@@ -274,6 +252,148 @@ export default class CdsService {
         return new Error(e.message);
       }
     }
+  }
+
+  public async uploadFile(
+    file: File,
+    entityId: string,
+    entitySetName: string
+  ): Promise<"success" | Error> {
+    try {
+      const fileName = file.name;
+      const array = await this.EncodeFile(file);
+      const url =
+        parent.Xrm.Utility.getGlobalContext().getClientUrl() +
+        "/api/data/v9.1/" +
+        entitySetName +
+        "(" +
+        entityId +
+        ")/axa_file";
+      let res = await this.makeRequest({
+        method: "PATCH",
+        fileName,
+        url,
+        bytes: null,
+        firstRequest: true,
+      });
+      let res1 = await this.fileChunckUpload({
+        response: res,
+        fileName: fileName,
+        fileBytes: array,
+      });
+      if (res1 instanceof Error || res instanceof Error) {
+        return new Error("Error uploading file");
+      } else {
+        return "success";
+      }
+    } catch (e: any) {
+      return new Error(e.message);
+    }
+  }
+
+  public async makeRequest({
+    method,
+    fileName,
+    url,
+    bytes,
+    firstRequest,
+    offset,
+    count,
+    fileBytes,
+  }: {
+    method: string;
+    fileName: string;
+    url: string;
+    bytes: Uint8Array | null;
+    firstRequest: boolean;
+    offset?: number;
+    count?: number;
+    fileBytes?: Uint8Array;
+  }): Promise<any> {
+    return new Promise(function (resolve, reject) {
+      const request = new XMLHttpRequest();
+      request.open(method, url);
+      if (firstRequest)
+        request.setRequestHeader("x-ms-transfer-mode", "chunked");
+      request.setRequestHeader("x-ms-file-name", fileName);
+      if (!firstRequest) {
+        request.setRequestHeader(
+          "Content-Range",
+          "bytes " +
+            offset +
+            "-" +
+            ((offset ?? 0) + (count ?? 0) - 1) +
+            "/" +
+            fileBytes?.length
+        );
+        request.setRequestHeader("Content-Type", "application/octet-stream");
+      }
+      request.onload = () => {
+        if (request.status >= 200 && request.status < 300) {
+          resolve(request);
+        } else {
+          reject(new Error(request.statusText));
+        }
+      };
+      request.onerror = () => {
+        reject(new Error(request.statusText));
+      };
+      if (!firstRequest) request.send(bytes);
+      else request.send();
+    });
+  }
+
+  public async fileChunckUpload({
+    response,
+    fileName,
+    fileBytes,
+  }: {
+    response: XMLHttpRequest;
+    fileName: string;
+    fileBytes: Uint8Array;
+  }): Promise<"success" | Error> {
+    const url = response.getResponseHeader("location") || "";
+    const chunkSize = parseInt(
+      response.getResponseHeader("x-ms-chunk-size") || ""
+    );
+    let offset = 0;
+    try {
+      while (offset <= fileBytes.length) {
+        const count =
+          offset + chunkSize > fileBytes.length
+            ? fileBytes.length % chunkSize
+            : chunkSize;
+        const content = new Uint8Array(count);
+        for (let i = 0; i < count; i++) {
+          content[i] = fileBytes[offset + i];
+        }
+        response = await this.makeRequest({
+          method: "PATCH",
+          fileName,
+          url,
+          bytes: content,
+          firstRequest: false,
+          offset,
+          count,
+          fileBytes,
+        });
+        if (response.status === 206) {
+          // partial content, so please continue.
+          offset += chunkSize;
+        } else if (response.status === 204) {
+          // request complete.
+          return "success";
+        } else {
+          // error happened.
+          // log error and take necessary action.
+          console.log("error happened");
+          return new Error("error happened" + response.status);
+        }
+      }
+    } catch (e: any) {
+      return new Error(e.message);
+    }
+    return "success";
   }
 
   public async deleteAttachments(attachments: Attachment[]) {
@@ -304,18 +424,18 @@ export default class CdsService {
     }
   }
 
-  public EncodeFile(file: File): Promise<string> {
+  public EncodeFile(file: File): Promise<Uint8Array> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = _f => {
-        console.dir(reader);
-        let res = (<string>reader.result).split(",")[1];
-        res = encodeURIComponent(res);
-        console.log(res);
-        resolve(res);
+      reader.onload = () => {
+        const arrayBuffer = reader.result as ArrayBuffer;
+        const array = new Uint8Array(arrayBuffer);
+
+        // this is the first request. We are passing content as null.
+        resolve(array);
       };
       reader.onerror = error => reject(error);
-      reader.readAsDataURL(file);
+      reader.readAsArrayBuffer(file);
     });
   }
 
