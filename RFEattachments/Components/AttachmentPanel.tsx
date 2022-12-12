@@ -14,39 +14,59 @@ import {
   SpinnerSize,
   Stack,
   Text,
+  TextField,
 } from "@fluentui/react";
 import { observer } from "mobx-react-lite";
 import * as React from "react";
-import { axa_attachment_axa_attachment_axa_type } from "../cds-generated/enums/axa_attachment_axa_attachment_axa_type";
 import { useAttachmentVM } from "../Context/context";
 import styles from "./App.module.css";
 import { useBoolean } from "@fluentui/react-hooks";
-import { Attachment } from "../types/Attachment";
+import { axa_attachment_axa_attachment_axa_type } from "../cds-generated/enums/axa_attachment_axa_attachment_axa_type";
+
+export function seperateCamelCaseString(str: string) {
+  return str.replace(/([a-z0-9])([A-Z])/g, "$1 $2");
+}
 
 const typeOptions: IDropdownOption[] = [
   {
-    key: axa_attachment_axa_attachment_axa_type.BidWaiver,
-    text: axa_attachment_axa_attachment_axa_type[
-      axa_attachment_axa_attachment_axa_type.BidWaiver
-    ],
-  },
-  {
     key: axa_attachment_axa_attachment_axa_type.DFA,
-    text: axa_attachment_axa_attachment_axa_type[
-      axa_attachment_axa_attachment_axa_type.DFA
-    ],
-  },
-  {
-    key: axa_attachment_axa_attachment_axa_type.MiscDocs,
-    text: axa_attachment_axa_attachment_axa_type[
-      axa_attachment_axa_attachment_axa_type.MiscDocs
-    ],
+    text: seperateCamelCaseString(
+      axa_attachment_axa_attachment_axa_type[
+        axa_attachment_axa_attachment_axa_type.DFA
+      ]
+    ),
   },
   {
     key: axa_attachment_axa_attachment_axa_type.Quote,
-    text: axa_attachment_axa_attachment_axa_type[
-      axa_attachment_axa_attachment_axa_type.Quote
-    ],
+    text: seperateCamelCaseString(
+      axa_attachment_axa_attachment_axa_type[
+        axa_attachment_axa_attachment_axa_type.Quote
+      ]
+    ),
+  },
+  {
+    key: axa_attachment_axa_attachment_axa_type.MiscDocs,
+    text: seperateCamelCaseString(
+      axa_attachment_axa_attachment_axa_type[
+        axa_attachment_axa_attachment_axa_type.MiscDocs
+      ]
+    ),
+  },
+  {
+    key: axa_attachment_axa_attachment_axa_type.BidWaiver,
+    text: seperateCamelCaseString(
+      axa_attachment_axa_attachment_axa_type[
+        axa_attachment_axa_attachment_axa_type.BidWaiver
+      ]
+    ),
+  },
+  {
+    key: axa_attachment_axa_attachment_axa_type.PaybackWorksheet,
+    text: seperateCamelCaseString(
+      axa_attachment_axa_attachment_axa_type[
+        axa_attachment_axa_attachment_axa_type.PaybackWorksheet
+      ]
+    ),
   },
 ];
 
@@ -56,6 +76,7 @@ const AttachmentPanel = () => {
   const [file, setFile] = React.useState<File>();
   const [typeInput, setTypeInput] =
     React.useState<axa_attachment_axa_attachment_axa_type>();
+  const [description, setDescription] = React.useState<string>();
   const [isLoading, { setTrue: startLoading, setFalse: stopLoading }] =
     useBoolean(false);
   const [fileName, setFileName] = React.useState<string>();
@@ -67,6 +88,14 @@ const AttachmentPanel = () => {
     if (option) {
       setTypeInput(option.key as axa_attachment_axa_attachment_axa_type);
     }
+  };
+
+  const resetState = () => {
+    setFile(undefined);
+    setFileName(undefined);
+    setTypeInput(undefined);
+    setDescription("");
+    setErrorMessage(undefined);
   };
 
   const onFileInputChangeHandler = (event: any) => {
@@ -107,49 +136,41 @@ const AttachmentPanel = () => {
 
   const onSaveButtonClickHandler = async () => {
     if (vm.formType === "new") {
-      if (file && typeInput) {
+      if (file && typeInput && description) {
         startLoading();
-        await vm.uploadFile(typeInput, file);
-        setFile(undefined);
-        setFileName(undefined);
-        setTypeInput(undefined);
-        setErrorMessage(undefined);
+        await vm.uploadFile(typeInput, description, file);
+        resetState();
         stopLoading();
         vm.isPanelOpen = false;
       }
-      setErrorMessage("Please select a file and type");
+      setErrorMessage("Please fill out all fields");
     } else if (vm.formType === "edit") {
-      if (file && typeInput) {
+      if (file && typeInput && description) {
         startLoading();
-        await vm.uploadFile(typeInput, file);
-        setFile(undefined);
-        setFileName(undefined);
-        setTypeInput(undefined);
-        setErrorMessage(undefined);
+        await vm.uploadFile(typeInput, description, file);
+        resetState();
         stopLoading();
         vm.isPanelOpen = false;
-      } else if (typeInput) {
+      } else if (typeInput && description) {
         startLoading();
-        await vm.uploadFile(typeInput);
-        setFile(undefined);
-        setFileName(undefined);
-        setTypeInput(undefined);
-        setErrorMessage(undefined);
+        const res = await vm.uploadFile(typeInput, description);
+        resetState();
         stopLoading();
         vm.isPanelOpen = false;
       }
-      setErrorMessage("Please select a file and type");
+      setErrorMessage("Please fill out all fields");
     }
   };
 
   React.useEffect(() => {
-    if (vm.formType === "edit") {
+    if (vm.formType === "edit" && vm.isPanelOpen) {
       fetchData();
     }
   }, [vm.isPanelOpen]);
 
   const fetchData = async () => {
     let selected = vm.selectedAttachments[0];
+    setDescription(selected.description);
     setTypeInput(selected.type);
     setFileName(selected.fileName);
   };
@@ -164,10 +185,8 @@ const AttachmentPanel = () => {
       </PrimaryButton>
       <DefaultButton
         onClick={() => {
-          setFile(undefined);
-          setFileName(undefined);
-          setTypeInput(undefined);
-          setErrorMessage(undefined);
+          resetState();
+
           vm.isPanelOpen = false;
         }}
       >
@@ -184,17 +203,12 @@ const AttachmentPanel = () => {
         }
         isOpen={vm.isPanelOpen}
         onOpen={() => {
-          setFile(undefined);
-          setFileName(undefined);
-          setTypeInput(undefined);
-          setErrorMessage(undefined);
+          resetState();
         }}
         headerTextProps={{ style: { marginBottom: "2em" } }}
         onDismiss={() => {
-          setFile(undefined);
-          setFileName(undefined);
-          setTypeInput(undefined);
-          setErrorMessage(undefined);
+          resetState();
+
           vm.isPanelOpen = false;
         }}
         onRenderFooterContent={onRenderFooterContent}
@@ -223,6 +237,18 @@ const AttachmentPanel = () => {
               }}
             />
           )}
+        </Stack>
+        <Stack className={styles["dropdown-container"]} horizontal>
+          <TextField
+            placeholder='Description'
+            multiline
+            autoAdjustHeight
+            value={description}
+            onChange={(_e, value) => {
+              setErrorMessage(undefined);
+              setDescription(value || "");
+            }}
+          />
         </Stack>
         <Stack className={styles["dropdown-container"]} horizontal>
           <DefaultButton

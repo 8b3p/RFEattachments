@@ -22,13 +22,14 @@ import {
   TrimFileExtension,
 } from "../utils/utils";
 import { axa_rfestatus } from "../cds-generated/enums/axa_rfestatus";
-import { FileToDownload } from "../types/FileToDownload";
+import { seperateCamelCaseString } from "../Components/AttachmentPanel";
 
 export interface IRow {
   key: string;
   type: string;
   fileName: string;
   iconSource: string;
+  description: string;
 }
 
 export default class AttachmentVM {
@@ -80,7 +81,6 @@ export default class AttachmentVM {
 
   public fetchData = async () => {
     this.isLoading = true;
-    await this.fetchRfeStatus();
     const [result1] = await Promise.allSettled([
       this.cdsService.retrieveAttachmentByRfeId(this.rfeGuid),
       this.fetchRfeStatus,
@@ -139,11 +139,14 @@ export default class AttachmentVM {
     this.Attachments.forEach(attachment => {
       _items.push({
         key: attachment.attachmentId?.id || "",
-        type: axa_attachment_axa_attachment_axa_type[attachment.type],
+        type: seperateCamelCaseString(
+          axa_attachment_axa_attachment_axa_type[attachment.type]
+        ),
         fileName: attachment.isThereFile
           ? TrimFileExtension(attachment.fileName)
           : "",
         iconSource: fileIconLink(GetFileExtension(attachment.fileName)).url,
+        description: attachment.description,
       });
     });
     this.listItems = _items;
@@ -154,8 +157,6 @@ export default class AttachmentVM {
         name: "File Type",
         className: styles.fileIconCell,
         iconClassName: styles.fileIconHeaderIcon,
-        ariaLabel:
-          "Column operations for File type, Press to sort on File type",
         iconName: "Page",
         isIconOnly: true,
         fieldName: "type",
@@ -177,11 +178,11 @@ export default class AttachmentVM {
         key: "column2",
         name: "Type",
         fieldName: "type",
-        minWidth: 50,
-        maxWidth: 75,
+        minWidth: 100,
+        maxWidth: 125,
         isRowHeader: true,
         isResizable: true,
-        isSorted: true,
+        isSorted: false,
         isSortedDescending: false,
         sortAscendingAriaLabel: "Sorted A to Z",
         sortDescendingAriaLabel: "Sorted Z to A",
@@ -220,6 +221,16 @@ export default class AttachmentVM {
         data: "string",
         isPadded: true,
       },
+      {
+        key: "column4",
+        name: "Description",
+        fieldName: "description",
+        minWidth: 300,
+        maxWidth: 400,
+        isResizable: true,
+        isMultiline: true,
+        data: "string",
+      },
     ];
     this.commandBarItems = [
       {
@@ -251,33 +262,49 @@ export default class AttachmentVM {
 
   public uploadFile = async (
     type: axa_attachment_axa_attachment_axa_type,
+    description: string,
     file?: File
   ) => {
     try {
       this.isLoading = true;
       if (this.formType === "new" && file) {
-        await this.cdsService.createFile({
+        const res = await this.cdsService.createFile({
           file,
           type,
+          description,
           entityId: this.rfeGuid,
           entityLogicalName: axa_requestforexpenditureMetadata.logicalName,
         });
+        if (res) {
+          this.fetchData();
+          return res;
+        }
       } else {
         if (this.isControlDisabled) {
           this.fetchData();
           return new Error("Control is disabled");
         }
-        if (file && type) {
-          await this.cdsService.updateFile({
+        if (file && type && description) {
+          const res = await this.cdsService.updateFile({
             file,
             type,
+            description,
             attachmentId: this.selectedAttachments[0].attachmentId.id || "",
           });
+          if (res) {
+            this.fetchData();
+            return res;
+          }
         } else {
-          await this.cdsService.updateFile({
+          const res = await this.cdsService.updateFile({
             type,
+            description,
             attachmentId: this.selectedAttachments[0].attachmentId.id || "",
           });
+          if (res) {
+            this.fetchData();
+            return res;
+          }
         }
       }
       await this.fetchData();

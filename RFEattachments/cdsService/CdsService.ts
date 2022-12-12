@@ -86,6 +86,7 @@ export default class CdsService {
             <attribute name="axa_attachmentid" />
             <attribute name="axa_name" />
             <attribute name="axa_file_name" />
+            <attribute name="axa_description" />
             <filter>
               <condition attribute="axa_rfe" operator="eq" value="${rfeId}" />
             </filter>
@@ -120,6 +121,7 @@ export default class CdsService {
           isThereFile: attachment.axa_file ? true : false,
           fileName: attachment.axa_file_name || "",
           extension: GetFileExtension(attachment.axa_file_name || ""),
+          description: attachment.axa_description || "",
         });
         return newAttachment;
       });
@@ -135,12 +137,14 @@ export default class CdsService {
     type,
     entityId,
     entityLogicalName,
+    description,
   }: {
     file: File;
     type: axa_attachment_axa_attachment_axa_type;
     entityId: string;
     entityLogicalName: string;
-  }): Promise<"success" | Error> {
+    description: string;
+  }): Promise<void | Error> {
     const attachment = new Attachment({
       attachmentId: new EntityReference(axa_attachmentMetadata.logicalName, ""),
       type: type,
@@ -148,11 +152,13 @@ export default class CdsService {
       extension: GetFileExtension(file.name),
       isThereFile: false,
       fileName: file.name,
+      description: description,
     });
 
     try {
       let data = {
         axa_type: type,
+        axa_description: description,
         ["axa_RFE@odata.bind"]: `/${axa_requestforexpenditureMetadata.collectionName}(${entityId})`,
       };
       const response = await this.context.webAPI.createRecord(
@@ -183,17 +189,18 @@ export default class CdsService {
       console.error(e.message);
       return new Error(e.message);
     }
-
-    return "success";
+    return;
   }
 
   public async updateFile({
     file,
     type,
+    description,
     attachmentId,
   }: {
     file?: File;
     type: axa_attachment_axa_attachment_axa_type;
+    description: string;
     attachmentId: string;
   }): Promise<void | Error> {
     if (file) {
@@ -208,7 +215,7 @@ export default class CdsService {
           this.context.webAPI.updateRecord(
             axa_attachmentMetadata.logicalName,
             attachmentId,
-            { axa_type: type }
+            { axa_type: type, axa_description: description }
           ),
         ]);
         if (
@@ -233,7 +240,7 @@ export default class CdsService {
         const response = await this.context.webAPI.updateRecord(
           axa_attachmentMetadata.logicalName,
           attachmentId,
-          { axa_type: type }
+          { axa_type: type, axa_description: description }
         );
         if (!response) {
           console.error("No response from CDS");

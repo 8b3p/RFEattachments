@@ -8,6 +8,7 @@ export class Attachment {
   rfe: EntityReference;
   isThereFile: boolean;
   fileName: string;
+  description: string;
   constructor({
     attachmentId,
     extension,
@@ -15,6 +16,7 @@ export class Attachment {
     rfe,
     isThereFile,
     fileName,
+    description,
   }: {
     attachmentId: EntityReference;
     fileType?: string;
@@ -23,6 +25,7 @@ export class Attachment {
     rfe: EntityReference;
     isThereFile: boolean;
     fileName: string;
+    description: string;
   }) {
     this.attachmentId = attachmentId;
     this.extension = extension;
@@ -30,5 +33,6 @@ export class Attachment {
     this.rfe = rfe;
     this.isThereFile = isThereFile;
     this.fileName = fileName;
+    this.description = description;
   }
 }
