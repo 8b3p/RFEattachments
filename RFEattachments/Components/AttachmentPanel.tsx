@@ -243,6 +243,7 @@ const AttachmentPanel = () => {
             placeholder='Description'
             multiline
             autoAdjustHeight
+            maxLength={300}
             value={description}
             onChange={(_e, value) => {
               setErrorMessage(undefined);
