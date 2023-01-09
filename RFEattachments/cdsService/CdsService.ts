@@ -27,7 +27,7 @@ export default class CdsService {
       );
       const [result, result1] = await Promise.allSettled([
         fetch(
-          "https://axagdev1.crm.dynamics.com/api/data/v9.0/fileattachments?$filter=fileattachmentid eq " +
+          "/api/data/v9.0/fileattachments?$filter=fileattachmentid eq " +
             fileIdRes.axa_file,
           {
             method: "GET",

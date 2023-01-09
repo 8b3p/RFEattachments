@@ -69,8 +69,8 @@ const Actions = () => {
           <PrimaryButton
             onClick={async () => {
               startLoading();
-              vm.toggleDeleteDialog();
               let response = await vm.deleteSelectedAttachments();
+              vm.toggleDeleteDialog();
               stopLoading();
               if (response instanceof Error) {
                 setError(response.message);
